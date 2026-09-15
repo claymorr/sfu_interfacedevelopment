@@ -1,0 +1,253 @@
+import os
+import re
+from datetime import datetime
+from dataclasses import dataclass
+from typing import List, Optional, Callable
+
+DATA_FILE = "patients.txt"
+
+PASSPORT_PATTERN = r"^\d{2}\s\d{2}-\d{6}$"
+BIRTH_DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
+PHONE_PATTERN = r"^(\+\d\(\d{3}\)\s\d{3}-\d{2}-\d{2}|\d\(\d{3}\)\s\d{3}-\d{4})$"
+TEMPERATURE_PATTERN = r"^\d{2}\.\d{2}$"
+RECORD_SEPARATOR = "---"
+
+
+@dataclass
+class Date:
+    dd: int
+    mm: int
+    yyyy: int
+
+@dataclass
+class Patient:
+    passport: str
+    name: str
+    birth_date: Date
+    phone: str
+    temperature: float
+
+
+def get_validated_input(
+    prompt: str, 
+    pattern: Optional[str] = None, 
+    validator: Optional[Callable[[str], bool]] = None, 
+    error_msg: str = "Неверный формат."
+) -> str:
+    while True:
+        user_input = input(prompt).strip()
+        
+        if not user_input:
+            print(error_msg)
+            continue
+            
+        if validator is not None and not validator(user_input):
+            print(error_msg)
+            continue
+            
+        if pattern is not None and not re.fullmatch(pattern, user_input):
+            print(error_msg)
+            continue
+            
+        return user_input
+
+
+def validate_passport(value: str) -> bool:
+    return bool(re.fullmatch(PASSPORT_PATTERN, value))
+
+
+def validate_name(value: str) -> bool:
+    return len(value.strip()) > 0
+
+
+def validate_birth_date(value: str) -> bool:
+    if not re.fullmatch(BIRTH_DATE_PATTERN, value):
+        return False
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+
+def validate_phone(value: str) -> bool:
+    return bool(re.fullmatch(PHONE_PATTERN, value))
+
+
+def validate_temperature(value: str) -> bool:
+    if not re.fullmatch(TEMPERATURE_PATTERN, value):
+        return False
+    try:
+        float(value)
+        return True
+    except ValueError:
+        return False
+
+
+def parse_birth_date(value: str) -> Date:
+    parsed = datetime.strptime(value, "%Y-%m-%d")
+    return Date(dd=parsed.day, mm=parsed.month, yyyy=parsed.year)
+
+
+def get_validated_passport() -> str:
+    return get_validated_input(
+        "Введите серию и номер паспорта: ",
+        pattern=PASSPORT_PATTERN,
+        error_msg="Неверный формат паспорта."
+    )
+
+
+def get_validated_name() -> str:
+    return get_validated_input(
+        "Введите ФИО пациента: ",
+        validator=validate_name,
+        error_msg="ФИО не может быть пустым."
+    )
+
+
+def get_validated_birth_date() -> Date:
+    while True:
+        user_input = input("Введите дату рождения: ").strip()
+        if validate_birth_date(user_input):
+            return parse_birth_date(user_input)
+        print("Неверный формат или несуществующая дата.")
+
+
+def get_validated_phone() -> str:
+    return get_validated_input(
+        "Введите номер телефона: ",
+        pattern=PHONE_PATTERN,
+        error_msg="Неверный формат телефона."
+    )
+
+
+def get_validated_temperature() -> float:
+    while True:
+        user_input = input("Введите температуру тела: ").strip()
+        if validate_temperature(user_input):
+            return float(user_input)
+        print("Неверный формат температуры.")
+
+
+def load_patients(filename: str) -> List[Patient]:
+    if not os.path.exists(filename):
+        print(f"Файл '{filename}' не найден. Начинаем с пустого списка.")
+        return []
+
+    patients: List[Patient] = []
+    
+    try:
+        with open(filename, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except OSError as e:
+        print(f"Ошибка чтения файла: {e}. Начинаем с пустого списка.")
+        return []
+
+    records: List[List[str]] = []
+    current_block: List[str] = []
+    
+    for raw_line in lines:
+        line = raw_line.rstrip("\n")
+        if line.strip() == "" or line.strip() == RECORD_SEPARATOR:
+            if current_block:
+                records.append(current_block)
+                current_block = []
+        else:
+            current_block.append(line)
+    
+    if current_block:
+        records.append(current_block)
+
+    for idx, block in enumerate(records, start=1):
+        if len(block) != 5:
+            print(f"Запись №{idx}: неверное количество строк. Пропуск.")
+            continue
+        
+        passport, name, birth_date_str, phone, temp_str = [s.strip() for s in block]
+        
+        if not validate_passport(passport):
+            print(f"Запись №{idx}: некорректный паспорт. Пропуск.")
+            continue
+        if not validate_name(name):
+            print(f"Запись №{idx}: некорректное ФИО. Пропуск.")
+            continue
+        if not validate_birth_date(birth_date_str):
+            print(f"Запись №{idx}: некорректная дата рождения. Пропуск.")
+            continue
+        if not validate_phone(phone):
+            print(f"Запись №{idx}: некорректный телефон. Пропуск.")
+            continue
+        if not validate_temperature(temp_str):
+            print(f"Запись №{idx}: некорректная температура. Пропуск.")
+            continue
+        
+        patients.append(Patient(
+            passport=passport,
+            name=name,
+            birth_date=parse_birth_date(birth_date_str),
+            phone=phone,
+            temperature=float(temp_str)
+        ))
+
+    return patients
+
+
+def ask_to_continue() -> bool:
+    while True:
+        choice = input("\nДобавить еще одного пациента? (да/нет): ").strip().lower()
+        if choice in ("да", "y", "yes"):
+            return True
+        if choice in ("нет", "n", "no"):
+            return False
+        print("Введите 'да' или 'нет'.")
+
+
+def print_all_patients(patients: List[Patient]):
+    print("\n" + "=" * 50)
+    print(" СПИСОК ПАЦИЕНТОВ")
+    print("=" * 50)
+    
+    if not patients:
+        print("Список пуст.")
+        return
+
+    for i, p in enumerate(patients, start=1):
+        print(f"Пациент № {i}")
+        print(f"  ФИО:        {p.name}")
+        print(f"  Паспорт:    {p.passport}")
+        print(f"  Дата рожд.: {p.birth_date.yyyy:04d}-{p.birth_date.mm:02d}-{p.birth_date.dd:02d}")
+        print(f"  Телефон:    {p.phone}")
+        print(f"  Температура:{p.temperature:.2f}")
+        print("-" * 50)
+
+
+def main():
+    print("=== Система регистрации пациентов ===")
+    
+    patients = load_patients(DATA_FILE)
+    print(f"Загружено записей из файла: {len(patients)}")
+    
+    while True:
+        print("\n--- Ввод данных пациента ---")
+        
+        new_patient = Patient(
+            passport=get_validated_passport(),
+            name=get_validated_name(),
+            birth_date=get_validated_birth_date(),
+            phone=get_validated_phone(),
+            temperature=get_validated_temperature()
+        )
+        
+        patients.append(new_patient)
+        print("\nДанные успешно сохранены.")
+        
+        if not ask_to_continue():
+            break
+            
+    print_all_patients(patients)
+    print("\nНажмите Enter для выхода...")
+    input()
+
+
+if __name__ == "__main__":
+    main()
