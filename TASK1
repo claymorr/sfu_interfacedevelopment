@@ -192,6 +192,21 @@ def load_patients(filename: str) -> List[Patient]:
     return patients
 
 
+def add_new_patient(patients: List[Patient]):
+    print("\n--- Ввод данных пациента ---")
+    
+    new_patient = Patient(
+        passport=get_validated_passport(),
+        name=get_validated_name(),
+        birth_date=get_validated_birth_date(),
+        phone=get_validated_phone(),
+        temperature=get_validated_temperature()
+    )
+    
+    patients.append(new_patient)
+    print("\nДанные успешно сохранены.")
+
+
 def ask_to_continue() -> bool:
     while True:
         choice = input("\nДобавить еще одного пациента? (да/нет): ").strip().lower()
@@ -228,21 +243,17 @@ def main():
     print(f"Загружено записей из файла: {len(patients)}")
     
     while True:
-        print("\n--- Ввод данных пациента ---")
+        choice = input("\nДобавить нового пациента? (да/нет): ").strip().lower()
         
-        new_patient = Patient(
-            passport=get_validated_passport(),
-            name=get_validated_name(),
-            birth_date=get_validated_birth_date(),
-            phone=get_validated_phone(),
-            temperature=get_validated_temperature()
-        )
-        
-        patients.append(new_patient)
-        print("\nДанные успешно сохранены.")
-        
-        if not ask_to_continue():
+        if choice in ("да", "y", "yes"):
+            add_new_patient(patients)
+            
+            if not ask_to_continue():
+                break
+        elif choice in ("нет", "n", "no"):
             break
+        else:
+            print("Введите 'да' или 'нет'.")
             
     print_all_patients(patients)
     print("\nНажмите Enter для выхода...")
