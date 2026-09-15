@@ -4,13 +4,7 @@ from datetime import datetime
 from dataclasses import dataclass
 from typing import List, Optional, Callable
 
-DATA_FILE = "patients.txt"
-
-PASSPORT_PATTERN = r"^\d{2}\s\d{2}-\d{6}$"
-BIRTH_DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
-PHONE_PATTERN = r"^(\+\d\(\d{3}\)\s\d{3}-\d{2}-\d{2}|\d\(\d{3}\)\s\d{3}-\d{4})$"
-TEMPERATURE_PATTERN = r"^\d{2}\.\d{2}$"
-RECORD_SEPARATOR = "---"
+DATA_FILE = r"C:\Users\KIRYU\!VSCODE\InterfaceDevelopmnet\patients"
 
 
 @dataclass
@@ -53,7 +47,7 @@ def get_validated_input(
 
 
 def validate_passport(value: str) -> bool:
-    return bool(re.fullmatch(PASSPORT_PATTERN, value))
+    return bool(re.fullmatch(r"^\d{2}\s\d{2}-\d{6}$", value))
 
 
 def validate_name(value: str) -> bool:
@@ -61,7 +55,7 @@ def validate_name(value: str) -> bool:
 
 
 def validate_birth_date(value: str) -> bool:
-    if not re.fullmatch(BIRTH_DATE_PATTERN, value):
+    if not re.fullmatch(r"^\d{4}-\d{2}-\d{2}$", value):
         return False
     try:
         datetime.strptime(value, "%Y-%m-%d")
@@ -71,11 +65,11 @@ def validate_birth_date(value: str) -> bool:
 
 
 def validate_phone(value: str) -> bool:
-    return bool(re.fullmatch(PHONE_PATTERN, value))
+    return bool(re.fullmatch(r"^(\+\d\(\d{3}\)\s\d{3}-\d{2}-\d{2}|\d\(\d{3}\)\s\d{3}-\d{4})$", value))
 
 
 def validate_temperature(value: str) -> bool:
-    if not re.fullmatch(TEMPERATURE_PATTERN, value):
+    if not re.fullmatch(r"^\d{2}\.\d{2}$", value):
         return False
     try:
         float(value)
@@ -92,7 +86,7 @@ def parse_birth_date(value: str) -> Date:
 def get_validated_passport() -> str:
     return get_validated_input(
         "Введите серию и номер паспорта: ",
-        pattern=PASSPORT_PATTERN,
+        pattern=r"^\d{2}\s\d{2}-\d{6}$",
         error_msg="Неверный формат паспорта."
     )
 
@@ -116,7 +110,7 @@ def get_validated_birth_date() -> Date:
 def get_validated_phone() -> str:
     return get_validated_input(
         "Введите номер телефона: ",
-        pattern=PHONE_PATTERN,
+        pattern=r"^(\+\d\(\d{3}\)\s\d{3}-\d{2}-\d{2}|\d\(\d{3}\)\s\d{3}-\d{4})$",
         error_msg="Неверный формат телефона."
     )
 
@@ -148,7 +142,7 @@ def load_patients(filename: str) -> List[Patient]:
     
     for raw_line in lines:
         line = raw_line.rstrip("\n")
-        if line.strip() == "" or line.strip() == RECORD_SEPARATOR:
+        if line.strip() == "" or line.strip() == "---":
             if current_block:
                 records.append(current_block)
                 current_block = []
@@ -191,7 +185,22 @@ def load_patients(filename: str) -> List[Patient]:
 
     return patients
 
-
+def save_patients(patients: List[Patient], filename: str) -> bool:
+    try:
+        with open(filename, "w", encoding="utf-8") as f:
+            for i, p in enumerate(patients):
+                f.write(f"{p.passport}\n")
+                f.write(f"{p.name}\n")
+                f.write(f"{p.birth_date.yyyy:04d}-{p.birth_date.mm:02d}-{p.birth_date.dd:02d}\n")
+                f.write(f"{p.phone}\n")
+                f.write(f"{p.temperature:.2f}\n")
+                if i < len(patients) - 1:
+                    f.write(f"{"---"}\n")
+        return True
+    except OSError as e:
+        print(f"Ошибка записи в файл: {e}")
+        return False
+    
 def add_new_patient(patients: List[Patient]):
     print("\n--- Ввод данных пациента ---")
     
@@ -255,6 +264,7 @@ def main():
         else:
             print("Введите 'да' или 'нет'.")
             
+    save_patients(patients, DATA_FILE)
     print_all_patients(patients)
     print("\nНажмите Enter для выхода...")
     input()
